@@ -7,7 +7,7 @@ public class VRButton : MonoBehaviour {
     [SerializeField]
     private float second;
 
-    private GameObject camera;
+    private GameObject observer;
     private int layerMask;
 
     public delegate void ButtonEvent();
@@ -21,7 +21,7 @@ public class VRButton : MonoBehaviour {
             ca = GameObject.FindObjectOfType<Camera>();
         }
 
-        camera = ca.gameObject;
+        observer = ca.gameObject;
         layerMask = LayerMask.GetMask("UI");
     }
 
@@ -30,7 +30,7 @@ public class VRButton : MonoBehaviour {
         float step = (second > 0) ? Time.deltaTime / second : 1f;
 
         RaycastHit hit;
-        if (Physics.Raycast(camera.transform.position, camera.transform.forward, out hit, Mathf.Infinity, layerMask))
+        if (Physics.Raycast(observer.transform.position, observer.transform.forward, out hit, Mathf.Infinity, layerMask))
         {
             VRButton b = hit.collider.gameObject.GetComponent<VRButton>();
             if (b != null)

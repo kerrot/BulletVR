@@ -6,13 +6,13 @@ public class ButtonChangeScene : MonoBehaviour {
     [SerializeField]
     private VRButton button;
     [SerializeField]
-    private string name;
+    private string sceneName;
 
     void Start()
     {
         if (button != null)
         {
-            button.OnPress = () => SceneManager.LoadScene(name);
+            button.OnPress = () => SceneManager.LoadScene(sceneName);
         }
     }
 

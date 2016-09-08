@@ -16,7 +16,7 @@ public class ShooterControl : MonoBehaviour
     [SerializeField]
     private GameObject gunCameraPos;
     [SerializeField]
-    private GameObject gunPos;
+    private GameObject bulletPos;
     [SerializeField]
     private GameObject HMD;
     [SerializeField]
@@ -27,6 +27,7 @@ public class ShooterControl : MonoBehaviour
     private LineDrawControl line;
     private AudioSource au;
     private int layerMask;
+	private Vector3 cameraWorkStep;
 
     public enum GameState
     {
@@ -83,7 +84,7 @@ public class ShooterControl : MonoBehaviour
     {
         List<Vector3> points = new List<Vector3>();
         List<GameObject> walls = new List<GameObject>();
-        ComputeBounce(gunPos.transform.position, gunPos.transform.forward, points, walls);
+        ComputeBounce(bulletPos.transform.position, bulletPos.transform.forward, points, walls);
 
         line.points = points.ToArray();
     }
@@ -127,17 +128,26 @@ public class ShooterControl : MonoBehaviour
         if (state == GameState.BEFORE_FIRE && Input.GetButton("Jump"))
         {
             bullet.transform.parent = null;
-            SetHMDOrigin(bulletCameraPos);
+			HMD.transform.parent = bulletCameraPos.transform;
+			HMD.transform.localRotation = Quaternion.identity;
+			cameraWorkStep = -HMD.transform.localPosition * Time.deltaTime;
             state = GameState.BEFORE_FLYING;
             bullet.GetComponent<Rigidbody>().velocity = bullet.transform.forward * bulletSpeed;
             au.Play();
         }
-//         else if (state == GameState.BULLET_FLYING)
-//         {
-//             state = GameState.BULLET_MISS;
-//             HMD.transform.parent = gunCameraPos.transform;
-//             Debug.Log(bulletCameraPos);
-//         }
+         else if (state == GameState.BULLET_FLYING && Input.GetButton("Jump"))
+         {
+             state = GameState.BULLET_MISS;
+             HMD.transform.parent = gunCameraPos.transform;
+			 bullet.transform.parent = bulletPos.transform;
+			 bullet.transform.localPosition = Vector3.zero;
+			 bullet.transform.localRotation = Quaternion.identity;
+             bullet.GetComponent<Rigidbody>().velocity = Vector3.zero;
+
+			 HMD.transform.parent = gunCameraPos.transform;
+		     HMD.transform.localRotation = Quaternion.identity;
+			 cameraWorkStep = -HMD.transform.localPosition * Time.deltaTime;
+         }
     }
 
     public void SetState(GameState s)
@@ -167,14 +177,26 @@ public class ShooterControl : MonoBehaviour
     {
         if (state == GameState.BEFORE_FLYING)
         {
-            Vector3 step = -HMD.transform.localPosition * Time.deltaTime;
-            if (step == Vector3.zero || Vector3.Distance(HMD.transform.position, gunCameraPos.transform.position) <= step.magnitude)
+            if (cameraWorkStep == Vector3.zero || HMD.transform.localPosition.magnitude <= cameraWorkStep.magnitude)
             {
+				HMD.transform.localPosition = Vector3.zero;
                 SetState(GameState.BULLET_FLYING);
                 return;
             }
 
-            HMD.transform.position += step;
+            HMD.transform.localPosition += cameraWorkStep;
+        }
+
+		if (state == GameState.BULLET_MISS)
+        {
+            if (cameraWorkStep == Vector3.zero || HMD.transform.localPosition.magnitude <= cameraWorkStep.magnitude)
+            {
+				HMD.transform.localPosition = Vector3.zero;
+                SetState(GameState.BEFORE_FIRE);
+                return;
+            }
+
+            HMD.transform.localPosition += cameraWorkStep;
         }
     }
 }
