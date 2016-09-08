@@ -9,7 +9,7 @@ public class LineDrawControl : MonoBehaviour {
 
     void OnRenderObject()
     {
-        if (points.Length > 0)
+        if (points != null && points.Length > 0)
         {
             lineMaterial.SetPass(0);
             //GL.PushMatrix();
