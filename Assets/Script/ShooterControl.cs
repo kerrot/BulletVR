@@ -21,6 +21,10 @@ public class ShooterControl : MonoBehaviour
     private GameObject HMD;
     [SerializeField]
     private GameObject GameClear;
+    [SerializeField]
+    private float h;
+    [SerializeField]
+    private float v;
 
     private float x;
     private float y;
