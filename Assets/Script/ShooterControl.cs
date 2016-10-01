@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.VR;
 using System.Collections;
+using System.Linq;
 using System.Collections.Generic;
 
 public class ShooterControl : MonoBehaviour
@@ -28,8 +29,6 @@ public class ShooterControl : MonoBehaviour
 
     private float x;
     private float y;
-    private float bx;
-    private float by;
 
     private LineDrawControl line;
     private AudioSource au;
@@ -37,10 +36,13 @@ public class ShooterControl : MonoBehaviour
 
     private CameraWork cw;
 
+    private BulletControl BC;
+
     public struct BounceRecord
     {
         public Vector3 point;
         public Vector3 reflect;
+        public int order;
     }
 
     Dictionary<GameObject, BounceRecord> records = new Dictionary<GameObject, BounceRecord>();
@@ -55,6 +57,8 @@ public class ShooterControl : MonoBehaviour
         CLEAR,
     };
 
+
+    public GameState State { get { return state; } }
     private GameState state = GameState.START_ANIMATION;
 
     void Start()
@@ -65,6 +69,10 @@ public class ShooterControl : MonoBehaviour
         layerMask = LayerMask.GetMask("Wall");
         cw = HMD.GetComponent<CameraWork>();
         cw.OnFollowEnd += CameraWorkEnd;
+
+        BC = bullet.GetComponent<BulletControl>();
+
+        transform.rotation = Quaternion.Euler(startRotation);
     }
 
     void Update()
@@ -82,15 +90,19 @@ public class ShooterControl : MonoBehaviour
 
     void UpdateGun()
     {
-        float h = Input.GetAxis("Horizontal");
-        float v = Input.GetAxis("Vertical");
+        h = Input.GetAxis("Horizontal");
+        v = Input.GetAxis("Vertical");
 
-        if (state == GameState.BEFORE_FIRE || state == GameState.BULLET_FLYING)
+        if (state == GameState.BEFORE_FIRE)
         {
             y += h;
             x -= v;
 
             transform.rotation = Quaternion.Euler(startRotation) * Quaternion.Euler(new Vector3(x * speed, y * speed, 0));
+        }
+        else if (state == GameState.BULLET_FLYING)
+        {
+            transform.LookAt(BC.ComputeGunTarget());
         }
     }
 
@@ -102,17 +114,20 @@ public class ShooterControl : MonoBehaviour
         }
         else
         {
-            records.Clear();
-
+            if (state == GameState.BEFORE_FIRE)
+            {
+                records.Clear();
+            }
             List<Vector3> points = new List<Vector3>();
             List<GameObject> walls = new List<GameObject>();
-            ComputeBounce(transform.position, transform.forward, points, walls);
+
+            ComputeBounce(0, transform.position, transform.forward, points, walls);
 
             line.points = points.ToArray();
         }
     }
 
-    Vector3 ComputeBounce(Vector3 position, Vector3 direction, List<Vector3> points, List<GameObject> walls)
+    Vector3 ComputeBounce(int index, Vector3 position, Vector3 direction, List<Vector3> points, List<GameObject> walls)
     {
         RaycastHit hit;
         if (Physics.Raycast(position, direction, out hit, Mathf.Infinity, layerMask))
@@ -131,9 +146,12 @@ public class ShooterControl : MonoBehaviour
                 position = hit.point;
                 direction = reflect;
 
-                records.Add(hit.collider.gameObject, new BounceRecord() { point = hit.point, reflect = reflect });
+                if (state == GameState.BEFORE_FIRE)
+                {
+                    records.Add(hit.collider.gameObject, new BounceRecord() { order = index++, point = hit.point, reflect = reflect });
+                }
 
-                return ComputeBounce(hit.point, reflect, points, walls);
+                return ComputeBounce(index, hit.point, reflect, points, walls);
             }
         }
 
@@ -152,6 +170,11 @@ public class ShooterControl : MonoBehaviour
         return new BounceRecord();
     }
 
+    public KeyValuePair<GameObject, BounceRecord> GetRecordByOrder(int order)
+    {
+        return records.FirstOrDefault(r => r.Value.order == order);
+    }
+
     void Fire()
     {
         if (Input.GetButton("Jump"))
@@ -164,10 +187,6 @@ public class ShooterControl : MonoBehaviour
                 state = GameState.BEFORE_FLYING;
                 bullet.GetComponent<Rigidbody>().velocity = bullet.transform.forward * bulletSpeed;
                 au.Play();
-            }
-            else if (state == GameState.BULLET_FLYING)
-            {
-                SetState(GameState.BULLET_MISS);
             }
         }
     }
@@ -189,13 +208,11 @@ public class ShooterControl : MonoBehaviour
                     bullet.GetComponent<Rigidbody>().velocity = Vector3.zero;
 
                     cw.SetCameraFollow(gunCameraPos);
+
+                    startRotation = transform.rotation.eulerAngles;
+                    x = 0;
+                    y = 0;
                 }
-                break;
-            case GameState.BULLET_FLYING:
-                {
-                    bx = 0;
-                    by = 0;
-}
                 break;
             case GameState.CLEAR:
                 {
